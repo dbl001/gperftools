@@ -86,6 +86,8 @@
 // * allocation of a reasonably complicated struct
 //   goes from about 1100 ns to about 300 ns.
 
+#include <execinfo.h>
+
 #include "config.h"
 #include <gperftools/tcmalloc.h>
 
@@ -1415,7 +1417,61 @@ inline struct mallinfo do_mallinfo() {
 
 static SpinLock set_new_handler_lock(SpinLock::LINKER_INITIALIZED);
 
+static SpinLock set_stat_lock(SpinLock::LINKER_INITIALIZED);
+static int last = 0;
+static size_t max_size = 0;
+static int target_len = 0;
+
 inline void* cpp_alloc(size_t size, bool nothrow) {
+  if (false)
+  {
+    void* array[6];
+    int stack_num = backtrace(array, 6);
+    char ** stacktrace = backtrace_symbols(array, stack_num);
+    int len = 0;
+    for (int i = 0; i < stack_num; ++i) len += strlen(stacktrace[i]);
+
+    if (false)
+    {
+      // append all stacks to one string
+      char rslt[len + 1];
+      int offset = 0;
+      for (int i = 0; i < stack_num; ++i)
+      {
+        memcpy(rslt + offset, stacktrace[i], strlen(stacktrace[i]));
+        offset += strlen(stacktrace[i]);
+      }
+      rslt[offset] = 0;
+    }
+
+    if (false)
+    {
+      // if (len == 567 || len == 523 || len == 451)
+      if (len == 567)
+      {
+        printf("len is %d\n", len);
+        for (int i = 0; i < stack_num; ++i)
+        {
+          printf("%s:%ld\n", stacktrace[i], strlen(stacktrace[i]));
+        }
+      }
+    }
+
+    free(stacktrace);
+
+    if (false)
+    {
+      SpinLockHolder h(&set_stat_lock);
+      if (max_size < size) { max_size = size; target_len = len; }
+      int cur = time(NULL);
+      if (cur - last > 1)
+      {
+        printf("max size is %lu, len is %d\n", max_size, target_len);
+        max_size = 0;
+        last = cur;
+      }
+    }
+  }
 #ifdef PREANSINEW
   return do_malloc(size);
 #else
