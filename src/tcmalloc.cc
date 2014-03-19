@@ -1018,6 +1018,16 @@ inline void* cpp_alloc(size_t size, bool nothrow);
 inline void* do_malloc(size_t size);
 inline void* do_malloc_no_errno(size_t size);
 
+static SpinLock set_stat_lock(SpinLock::LINKER_INITIALIZED);
+static int last = 0;
+static size_t max_size = 0;
+static int target_len = 0;
+// static int max_len = 0;
+// static int min_len = 10000;
+static int max_len = 583;
+static int min_len = 155;
+static int stats[428];
+
 // TODO(willchan): Investigate whether or not lining this much is harmful to
 // performance.
 // This is equivalent to do_malloc() except when tc_new_mode is set to true.
@@ -1103,6 +1113,142 @@ inline void* do_malloc_no_errno(size_t size) {
 }
 
 inline void* do_malloc(size_t size) {
+  if (false)
+  {
+    SpinLockHolder h(&set_stat_lock);
+  }
+  if (false)
+  {
+    SpinLockHolder h(&set_stat_lock);
+    max_size += size;
+    int cur = time(NULL);
+    if (cur - last >= 1)
+    {
+      printf("this second malloc %lu M\n", max_size / 1048576);
+      max_size = 0;
+      last = cur;
+    }
+  }
+  if (false)
+  {
+    SpinLockHolder h(&set_stat_lock);
+    if (max_size < size) { max_size = size; }
+    int cur = time(NULL);
+    if (cur - last >= 1)
+    {
+      printf("max size of this second is %lu\n", max_size);
+      max_size = 0;
+      last = cur;
+    }
+  }
+  if (false)
+  {
+    SpinLockHolder h(&set_stat_lock);
+    max_size++;
+    printf("size is %lu\n", size);
+    int cur = time(NULL);
+    if (cur - last >= 1)
+    {
+      printf("this second alloc time %lu\n", max_size);
+      max_size = 0;
+      last = cur;
+    }
+  }
+  if (false)
+  {
+    SpinLockHolder h(&set_stat_lock);
+    if (8704 == size) max_size++;
+    int cur = time(NULL);
+    if (cur - last >= 1)
+    {
+      printf("this second alloc 8K time %lu\n", max_size);
+      max_size = 0;
+      last = cur;
+    }
+  }
+  if (false && size == 8704)
+  {
+    SpinLockHolder h(&set_stat_lock);
+    tc_new_mode = 1;
+    void* array[6];
+    int stack_num = backtrace(array, 6);
+    char ** stacktrace = backtrace_symbols(array, stack_num);
+    tc_new_mode = 0;
+
+    int len = 0;
+    for (int i = 0; i < stack_num; ++i) len += strlen(stacktrace[i]);
+
+    if (false)
+    {
+      // append all stacks to one string
+      char rslt[len + 1];
+      int offset = 0;
+      for (int i = 0; i < stack_num; ++i)
+      {
+        memcpy(rslt + offset, stacktrace[i], strlen(stacktrace[i]));
+        offset += strlen(stacktrace[i]);
+      }
+      rslt[offset] = 0;
+    }
+
+    if (false)
+    {
+      // if (len == 567 || len == 523 || len == 451)
+      if (size == 8704)
+      {
+        max_size++;
+        if (0 == max_size % 10000)
+        {
+          printf("len is %d\n", len);
+          for (int i = 0; i < stack_num; ++i)
+          {
+            printf("%s:%ld\n", stacktrace[i], strlen(stacktrace[i]));
+          }
+        }
+      }
+    }
+
+    free(stacktrace);
+
+    if (false)
+    {
+      if (max_size < size) { max_size = size; target_len = len; }
+      int cur = time(NULL);
+      if (cur - last >= 1)
+      {
+        printf("max size is %lu, len is %d\n", max_size, target_len);
+        max_size = 0;
+        last = cur;
+      }
+    }
+
+    if (false)
+    {
+      if (len < min_len) { min_len = len; printf("min len changed: %d\n", min_len); }
+      if (len > max_len) { max_len = len; printf("max len changed: %d\n", max_len); }
+    }
+
+    if (false)
+    {
+      if (len >= min_len && len <= max_len) {
+        stats[len - min_len] += size;
+      }
+      int cur = time(NULL);
+      if (cur - last >= 1)
+      {
+        for (int i = min_len; i <= max_len; i++) {
+          if (max_size < stats[i - min_len]) {
+            max_size = stats[i - min_len];
+            target_len = i;
+          }
+          stats[i - min_len] = 0;
+        }
+        max_size = 0;
+        printf("max_size is %lu M, target len is %d\n", max_size / 1048576, target_len);
+        last = cur;
+      }
+    }
+  }
   void* ret = do_malloc_no_errno(size);
   if (UNLIKELY(ret == NULL)) errno = ENOMEM;
   return ret;
@@ -1417,61 +1563,7 @@ inline struct mallinfo do_mallinfo() {
 
 static SpinLock set_new_handler_lock(SpinLock::LINKER_INITIALIZED);
 
-static SpinLock set_stat_lock(SpinLock::LINKER_INITIALIZED);
-static int last = 0;
-static size_t max_size = 0;
-static int target_len = 0;
-
 inline void* cpp_alloc(size_t size, bool nothrow) {
-  if (false)
-  {
-    void* array[6];
-    int stack_num = backtrace(array, 6);
-    char ** stacktrace = backtrace_symbols(array, stack_num);
-    int len = 0;
-    for (int i = 0; i < stack_num; ++i) len += strlen(stacktrace[i]);
-
-    if (false)
-    {
-      // append all stacks to one string
-      char rslt[len + 1];
-      int offset = 0;
-      for (int i = 0; i < stack_num; ++i)
-      {
-        memcpy(rslt + offset, stacktrace[i], strlen(stacktrace[i]));
-        offset += strlen(stacktrace[i]);
-      }
-      rslt[offset] = 0;
-    }
-
-    if (false)
-    {
-      // if (len == 567 || len == 523 || len == 451)
-      if (len == 567)
-      {
-        printf("len is %d\n", len);
-        for (int i = 0; i < stack_num; ++i)
-        {
-          printf("%s:%ld\n", stacktrace[i], strlen(stacktrace[i]));
-        }
-      }
-    }
-
-    free(stacktrace);
-
-    if (false)
-    {
-      SpinLockHolder h(&set_stat_lock);
-      if (max_size < size) { max_size = size; target_len = len; }
-      int cur = time(NULL);
-      if (cur - last > 1)
-      {
-        printf("max size is %lu, len is %d\n", max_size, target_len);
-        max_size = 0;
-        last = cur;
-      }
-    }
-  }
 #ifdef PREANSINEW
   return do_malloc(size);
 #else
